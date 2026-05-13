@@ -10,7 +10,7 @@ type OutgoingPayload = SyncPayload extends infer Payload
   : never
 
 const EVENT_NAME = 'client-sketch-sync'
-const CHANNEL_NAME = 'private-draw-and-guess-room'
+const CHANNEL_NAME = 'public-draw-and-guess-room'
 
 export function useRealtimeRoom(onRemotePayload: (payload: SyncPayload) => void) {
   const [connectionState, setConnectionState] = useState<ConnectionState>(() =>
@@ -45,7 +45,8 @@ export function useRealtimeRoom(onRemotePayload: (payload: SyncPayload) => void)
 
     const pusher = new Pusher(key, {
       cluster,
-      authEndpoint: '/pusher/auth',
+      forceTLS: true,
+      enabledTransports: ['ws', 'xhr_streaming'],
     })
 
     pusher.connection.bind('connected', () => setConnectionState('connected'))
@@ -54,7 +55,6 @@ export function useRealtimeRoom(onRemotePayload: (payload: SyncPayload) => void)
     const channel = pusher.subscribe(CHANNEL_NAME)
     pusherChannelRef.current = channel
 
-    channel.bind('pusher:subscription_error', () => setConnectionState('local'))
     channel.bind(EVENT_NAME, (payload: SyncPayload) => {
       if (payload.senderId !== senderId) {
         remoteHandlerRef.current(payload)
@@ -73,10 +73,12 @@ export function useRealtimeRoom(onRemotePayload: (payload: SyncPayload) => void)
     const event = { ...payload, senderId } as SyncPayload
     broadcastRef.current?.postMessage(event)
 
-    try {
-      pusherChannelRef.current?.trigger(EVENT_NAME, event)
-    } catch {
-      setConnectionState((state) => (state === 'connected' ? 'local' : state))
+    if (pusherChannelRef.current) {
+      try {
+        pusherChannelRef.current.trigger(EVENT_NAME, event)
+      } catch (error) {
+        console.error('Pusher trigger error:', error)
+      }
     }
   }
 
