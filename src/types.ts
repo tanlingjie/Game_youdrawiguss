@@ -1,3 +1,7 @@
+export type Role = 'drawer' | 'guesser' | null
+
+export type GameState = 'idle' | 'drawing' | 'animating'
+
 export type Point = {
   x: number
   y: number
@@ -24,4 +28,20 @@ export type SyncPayload =
   | { type: 'clear'; senderId: string }
   | { type: 'undo'; pathId: string; senderId: string }
   | { type: 'chat'; message: ChatMessage; senderId: string }
-  | { type: 'word'; word: string; senderId: string }
+
+export type RoleClaimPayload = {
+  playerId: string
+  playerName: string
+}
+
+export type SetWordPayload = {
+  word: string
+  drawerId: string
+  drawerName: string
+}
+
+export type GuessCorrectPayload = {
+  winnerId: string
+  winnerName: string
+  word: string
+}

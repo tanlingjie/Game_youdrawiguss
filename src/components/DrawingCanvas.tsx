@@ -1,3 +1,4 @@
+import { Lock } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import type { DrawPath, Point } from '../types'
 
@@ -5,6 +6,8 @@ type DrawingCanvasProps = {
   paths: DrawPath[]
   color: string
   width: number
+  disabled?: boolean
+  disabledLabel?: string
   onPathComplete: (path: DrawPath) => void
 }
 
@@ -42,6 +45,8 @@ export function DrawingCanvas({
   paths,
   color,
   width,
+  disabled = false,
+  disabledLabel = '当前不可作画',
   onPathComplete,
 }: DrawingCanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null)
@@ -91,6 +96,7 @@ export function DrawingCanvas({
   }
 
   const handlePointerDown = (event: React.PointerEvent<HTMLCanvasElement>) => {
+    if (disabled) return
     const point = getCanvasPoint(event)
     if (!point) return
     event.currentTarget.setPointerCapture(event.pointerId)
@@ -105,7 +111,7 @@ export function DrawingCanvas({
   }
 
   const handlePointerMove = (event: React.PointerEvent<HTMLCanvasElement>) => {
-    if (!isDrawing || !currentPathRef.current) return
+    if (disabled || !isDrawing || !currentPathRef.current) return
     const point = getCanvasPoint(event)
     if (!point) return
 
@@ -121,20 +127,30 @@ export function DrawingCanvas({
     const path = currentPathRef.current
     currentPathRef.current = null
     setIsDrawing(false)
-    if (path.points.length > 0) {
-      onPathComplete(path)
-    }
+    if (path.points.length > 0) onPathComplete(path)
   }
 
   return (
-    <canvas
-      ref={canvasRef}
-      className="h-[58vh] min-h-[420px] w-full touch-none rounded-[24px] border border-black/[0.06] bg-white/85 shadow-inner outline-none"
-      onPointerDown={handlePointerDown}
-      onPointerMove={handlePointerMove}
-      onPointerUp={finishPath}
-      onPointerCancel={finishPath}
-      aria-label="你画我猜画板"
-    />
+    <div className="relative">
+      <canvas
+        ref={canvasRef}
+        className={`h-[58vh] min-h-[420px] w-full rounded-[24px] border border-black/[0.06] bg-white/85 shadow-inner outline-none ${
+          disabled ? 'cursor-not-allowed opacity-90' : 'touch-none'
+        }`}
+        onPointerDown={handlePointerDown}
+        onPointerMove={handlePointerMove}
+        onPointerUp={finishPath}
+        onPointerCancel={finishPath}
+        aria-label="你画我猜画板"
+      />
+      {disabled && (
+        <div className="pointer-events-none absolute inset-0 flex items-center justify-center rounded-[24px] bg-white/20 backdrop-blur-[1px]">
+          <div className="inline-flex items-center gap-2 rounded-full border border-white/60 bg-white/80 px-4 py-2 text-sm text-slate-600 shadow-sm">
+            <Lock className="h-4 w-4" />
+            {disabledLabel}
+          </div>
+        </div>
+      )}
+    </div>
   )
 }

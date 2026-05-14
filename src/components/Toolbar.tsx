@@ -4,6 +4,7 @@ type ToolbarProps = {
   color: string
   width: number
   canUndo: boolean
+  disabled?: boolean
   onColorChange: (color: string) => void
   onWidthChange: (width: number) => void
   onUndo: () => void
@@ -16,6 +17,7 @@ export function Toolbar({
   color,
   width,
   canUndo,
+  disabled = false,
   onColorChange,
   onWidthChange,
   onUndo,
@@ -29,12 +31,13 @@ export function Toolbar({
             key={item}
             type="button"
             aria-label={`选择 ${item}`}
+            disabled={disabled}
             onClick={() => onColorChange(item)}
             className={`h-8 w-8 rounded-full border transition ${
               color === item
                 ? 'border-slate-950 shadow-[0_0_0_3px_rgba(17,24,39,0.10)]'
                 : 'border-black/5'
-            }`}
+            } disabled:cursor-not-allowed disabled:opacity-40`}
             style={{ backgroundColor: item }}
           />
         ))}
@@ -47,9 +50,10 @@ export function Toolbar({
           type="range"
           min="2"
           max="18"
+          disabled={disabled}
           value={width}
           onChange={(event) => onWidthChange(Number(event.target.value))}
-          className="w-24 accent-slate-900"
+          className="w-24 accent-slate-900 disabled:opacity-40"
         />
         <span className="w-6 text-right">{width}</span>
       </label>
@@ -57,7 +61,7 @@ export function Toolbar({
       <button
         type="button"
         onClick={onUndo}
-        disabled={!canUndo}
+        disabled={disabled || !canUndo}
         className="inline-flex h-11 items-center gap-2 rounded-xl border border-black/[0.06] bg-white/70 px-4 text-sm font-medium text-slate-700 transition hover:bg-white disabled:cursor-not-allowed disabled:opacity-40"
       >
         <RotateCcw className="h-4 w-4" />
@@ -66,14 +70,15 @@ export function Toolbar({
       <button
         type="button"
         onClick={onClear}
-        className="inline-flex h-11 items-center gap-2 rounded-xl border border-black/[0.06] bg-white/70 px-4 text-sm font-medium text-slate-700 transition hover:bg-white"
+        disabled={disabled}
+        className="inline-flex h-11 items-center gap-2 rounded-xl border border-black/[0.06] bg-white/70 px-4 text-sm font-medium text-slate-700 transition hover:bg-white disabled:cursor-not-allowed disabled:opacity-40"
       >
         <Trash2 className="h-4 w-4" />
         清空
       </button>
       <div className="ml-auto hidden items-center gap-2 rounded-xl bg-white/50 px-3 py-2 text-xs text-slate-500 sm:flex">
         <Eraser className="h-4 w-4" />
-        压感式平滑轨迹
+        平滑笔触
       </div>
     </div>
   )
