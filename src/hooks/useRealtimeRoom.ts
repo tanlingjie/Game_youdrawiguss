@@ -16,10 +16,14 @@ type OutgoingPayload = SyncPayload extends infer Payload
   : never
 
 const EVENT_NAME = 'client-sketch-sync'
-const CHANNEL_NAME = 'public-draw-and-guess-room'
+const CHANNEL_NAME = 'presence-draw-room'
 
 export function useRealtimeRoom(onRemotePayload: (payload: SyncPayload) => void) {
-  const [connectionState, setConnectionState] = useState<ConnectionState>('connecting')
+  const [connectionState, setConnectionState] = useState<ConnectionState>(() =>
+    import.meta.env.VITE_PUSHER_KEY && import.meta.env.VITE_PUSHER_CLUSTER
+      ? 'connecting'
+      : 'local',
+  )
   const senderId = useMemo(() => crypto.randomUUID(), [])
   const broadcastRef = useRef<BroadcastChannel | null>(null)
   const pusherChannelRef = useRef<Channel | null>(null)
@@ -41,18 +45,18 @@ export function useRealtimeRoom(onRemotePayload: (payload: SyncPayload) => void)
     const key = import.meta.env.VITE_PUSHER_KEY
     const cluster = import.meta.env.VITE_PUSHER_CLUSTER
 
-    console.log('Current Key:', key)
-
     if (!key || !cluster) {
       console.error('Missing Pusher env values.', {
         key,
         cluster,
       })
+      return () => broadcast.close()
     }
 
-    const pusher = new Pusher(key ?? '', {
-      cluster: cluster ?? '',
+    const pusher = new Pusher(key, {
+      cluster,
       forceTLS: true,
+      authEndpoint: '/api/pusher/auth',
       enabledTransports: ['ws', 'xhr_streaming'],
     })
     window.pusher = pusher
@@ -60,7 +64,7 @@ export function useRealtimeRoom(onRemotePayload: (payload: SyncPayload) => void)
     pusher.connection.bind('connected', () => setConnectionState('connected'))
     pusher.connection.bind('error', (error: unknown) => {
       console.error('Pusher connection error:', error)
-      setConnectionState('local')
+      setConnectionState('error')
     })
 
     const channel = pusher.subscribe(CHANNEL_NAME)
@@ -69,6 +73,9 @@ export function useRealtimeRoom(onRemotePayload: (payload: SyncPayload) => void)
     channel.bind('pusher:subscription_error', (error: unknown) => {
       console.error('Pusher subscription error:', error)
       setConnectionState('error')
+    })
+    channel.bind('pusher:subscription_succeeded', () => {
+      setConnectionState('connected')
     })
     channel.bind(EVENT_NAME, (payload: SyncPayload) => {
       if (payload.senderId !== senderId) {
