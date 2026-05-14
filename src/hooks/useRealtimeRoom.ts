@@ -2,6 +2,12 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import Pusher, { type Channel } from 'pusher-js'
 import type { SyncPayload } from '../types'
 
+declare global {
+  interface Window {
+    pusher?: Pusher
+  }
+}
+
 type ConnectionState = 'connecting' | 'connected' | 'local' | 'error'
 type OutgoingPayload = SyncPayload extends infer Payload
   ? Payload extends { senderId: string }
@@ -13,11 +19,7 @@ const EVENT_NAME = 'client-sketch-sync'
 const CHANNEL_NAME = 'public-draw-and-guess-room'
 
 export function useRealtimeRoom(onRemotePayload: (payload: SyncPayload) => void) {
-  const [connectionState, setConnectionState] = useState<ConnectionState>(() =>
-    import.meta.env.VITE_PUSHER_KEY && import.meta.env.VITE_PUSHER_CLUSTER
-      ? 'connecting'
-      : 'local',
-  )
+  const [connectionState, setConnectionState] = useState<ConnectionState>('connecting')
   const senderId = useMemo(() => crypto.randomUUID(), [])
   const broadcastRef = useRef<BroadcastChannel | null>(null)
   const pusherChannelRef = useRef<Channel | null>(null)
@@ -36,25 +38,38 @@ export function useRealtimeRoom(onRemotePayload: (payload: SyncPayload) => void)
       }
     }
 
-    const key = import.meta.env.VITE_PUSHER_KEY as string | undefined
-    const cluster = import.meta.env.VITE_PUSHER_CLUSTER as string | undefined
+    const key = import.meta.env.VITE_PUSHER_KEY
+    const cluster = import.meta.env.VITE_PUSHER_CLUSTER
+
+    console.log('Current Key:', key)
 
     if (!key || !cluster) {
-      return () => broadcast.close()
+      console.error('Missing Pusher env values.', {
+        key,
+        cluster,
+      })
     }
 
-    const pusher = new Pusher(key, {
-      cluster,
+    const pusher = new Pusher(key ?? '', {
+      cluster: cluster ?? '',
       forceTLS: true,
       enabledTransports: ['ws', 'xhr_streaming'],
     })
+    window.pusher = pusher
 
     pusher.connection.bind('connected', () => setConnectionState('connected'))
-    pusher.connection.bind('error', () => setConnectionState('local'))
+    pusher.connection.bind('error', (error: unknown) => {
+      console.error('Pusher connection error:', error)
+      setConnectionState('local')
+    })
 
     const channel = pusher.subscribe(CHANNEL_NAME)
     pusherChannelRef.current = channel
 
+    channel.bind('pusher:subscription_error', (error: unknown) => {
+      console.error('Pusher subscription error:', error)
+      setConnectionState('error')
+    })
     channel.bind(EVENT_NAME, (payload: SyncPayload) => {
       if (payload.senderId !== senderId) {
         remoteHandlerRef.current(payload)
@@ -65,6 +80,7 @@ export function useRealtimeRoom(onRemotePayload: (payload: SyncPayload) => void)
       channel.unbind_all()
       pusher.unsubscribe(CHANNEL_NAME)
       pusher.disconnect()
+      delete window.pusher
       broadcast.close()
     }
   }, [senderId])
